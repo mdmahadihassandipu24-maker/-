@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>নাটোর জেলা ইফতার ট্র্যাকার | বিরিয়ানি কাউন্টার</title>
+    <!-- Leaflet CSS / JS (Google Maps-এর মতো ইন্টারঅ্যাকটিভ ম্যাপ) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body, html {
+            height: 100%;
+            width: 100%;
+        }
+        /* হেডার স্টাইল - গুগল ম্যাপের মতো ক্লিন হেডার */
+        .header {
+            background: #1e3c2c;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 1000;
+            position: relative;
+        }
+        .header-left {
+            display: flex;
+            flex-direction: column;
+        }
+        .header-left h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+        .header-left h1 i {
+            color: #ffb347;
+            margin-right: 8px;
+        }
+        .header-left .developer {
+            font-size: 0.8rem;
+            color: #ffb347;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+        .header-right {
+            background: #ffb347;
+            color: #1e3c2c;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-right i {
+            font-size: 1.4rem;
+        }
+        #map {
+            height: calc(100% - 70px);  /* হেডারের উচ্চতা বাদে */
+            width: 100%;
+            background: #e5e3df; /* গুগল ম্যাপের ব্যাকগ্রাউন্ডের মতো */
+        }
+        /* ইনফো বক্স - ইউজার ফ্রেন্ডলি স্ট্যাটিসটিক্স */
+        .stats-bar {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            border: 2px solid #ffb347;
+            backdrop-filter: blur(5px);
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .stat-icon {
+            background: #1e3c2c;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        .stat-text {
+            font-weight: 600;
+        }
+        .stat-text span {
+            font-size: 1.2rem;
+            color: #1e3c2c;
+        }
+        .stat-text small {
+            color: #666;
+            font-size: 0.8rem;
+        }
+        /* লিজেন্ড (রঙের অর্থ) */
+        .legend-box {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 12px 18px;
+            border-radius: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            font-size: 0.8rem;
+            border: 1px solid #ddd;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+        }
+        .color-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        /* পপআপ কাস্টমাইজ */
+        .custom-popup .leaflet-popup-content {
+            min-width: 220px;
+            font-size: 0.9rem;
+        }
+        .add-btn {
+            background: #1e3c2c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 5px 3px 0;
+            font-size: 0.8rem;
+            transition: 0.2s;
+        }
+        .add-btn:hover {
+            background: #ffb347;
+            color: #1e3c2c;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            font-size: 0.8rem;
+        }
+        /* ফুটার খুব ছোট (ঐচ্ছিক) */
+        .tiny-footer {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 0.6rem;
+            backdrop-filter: blur(2px);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- হেডার - গুগল ম্যাপ স্টাইলে -->
+    <div class="header">
+        <div class="header-left">
+            <h1><i class="fas fa-map-marked-alt"></i> নাটোর জেলা ইফতার ট্র্যাকার</h1>
+            <div class="developer">Developed by Md Mahadi Hassan Dipu</div>
+        </div>
+        <div class="header-right" id="biryaniCounter">
+            <i class="fas fa-utensils"></i>
+            <span id="biryaniCount">৫</span> জায়গায় বিরিয়ানি
+        </div>
+    </div>
+
+    <!-- মানচিত্রের কন্টেইনার -->
+    <div id="map"></div>
+
+    <!-- স্ট্যাটিসটিক্স বার (ইউজার ফ্রেন্ডলি) -->
+    <div class="stats-bar">
+        <div class="stat-item">
+            <div class="stat-icon"><i class="fas fa-mosque"></i></div>
+            <div class="stat-text">
+                <span id="totalIftar">১২</span> <small>মোট ইফতার</small>
+            </div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-icon"><i class="fas fa-fire"></i></div>
+            <div class="stat-text">
+                <span id="biryaniStat">৫</span> <small>বিরিয়ানি দিচ্ছে</small>
+            </div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+            <div class="stat-text">
+                <span id="activeUsers">৪৭</span> <small>সক্রিয়</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- লিজেন্ড (রঙের ব্যাখ্যা) -->
+    <div class="legend-box">
+        <div class="legend-item"><span class="color-dot" style="background:#4CAF50;"></span> যাচাইকৃত</div>
+        <div class="legend-item"><span class="color-dot" style="background:#FFC107;"></span> অযাচাইকৃত</div>
+        <div class="legend-item"><span class="color-dot" style="background:#2196F3;"></span> আপনার যোগ করা</div>
+        <div class="legend-item"><span class="color-dot" style="background:#ffb347;"></span> <i class="fas fa-crown" style="font-size:10px;"></i> বিরিয়ানি দিচ্ছে</div>
+    </div>
+
+    <!-- খুব ছোট ফুটার (প্রায় অদৃশ্য) -->
+    <div class="tiny-footer">🍛 Natore Iftar Tracker | Community Driven</div>
+
+    <!-- স্ক্রিপ্ট -->
+    <script>
+        (function() {
+            // ---------- কনফিগারেশন ----------
+            const map = L.map('map', {
+                zoomControl: true,
+                attributionControl: true
+            }).setView([24.4136, 88.9872], 11);  // নাটোর সেন্টার
+
+            // গুগল ম্যাপ-স্টাইলের টাইলস (রাস্তা ও লেবেল ক্লিয়ার)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; CartoDB'
+            }).addTo(map);
+
+            // নাটোর জেলার সীমানা (আনুমানিক)
+            const bounds = L.latLngBounds(
+                L.latLng(24.1836, 88.7872), // দক্ষিণ-পশ্চিম
+                L.latLng(24.6436, 89.1872)  // উত্তর-পূর্ব
+            );
+            map.setMaxBounds(bounds);
+            map.on('drag', function() { map.panInsideBounds(bounds, { animate: false }); });
+
+            // মার্কার লেয়ার
+            const biryaniLayer = L.layerGroup().addTo(map);
+
+            // ---------- নমুনা ডাটা (নাটোরের বিভিন্ন মসজিদ) ----------
+            const sampleLocations = [
+                {lat: 24.4136, lng: 88.9872, name: "নাটোর রাজবাড়ী মসজিদ", desc: "রাজবাড়ীর পাশে। ইফতারে বিশেষ আয়োজন থাকে।", verified: true, hasBiryani: true},
+                {lat: 24.3836, lng: 88.9372, name: "নাটোর কেন্দ্রীয় জামে মসজিদ", desc: "শহরের প্রধান মসজিদ। প্রতিদিন ইফতার বিতরণ।", verified: true, hasBiryani: true},
+                {lat: 24.5136, lng: 89.0372, name: "লালপুর উপজেলা মসজিদ", desc: "শুক্রবার ও বিশেষ দিনে বিরিয়ানি দেয়।", verified: false, hasBiryani: true},
+                {lat: 24.3436, lng: 89.0872, name: "সিংড়া দারুস সালাম মসজিদ", desc: "স্থানীয়দের পক্ষ থেকে ইফতার।", verified: true, hasBiryani: false},
+                {lat: 24.4536, lng: 88.8872, name: "গুরুদাসপুর বড় মসজিদ", desc: "প্রতি শুক্রবার বিরিয়ানি সহ ইফতার।", verified: false, hasBiryani: true},
+                {lat: 24.4040, lng: 88.9780, name: "বড়াইগ্রাম কেন্দ্রীয় মসজিদ", desc: "আজ ইফতারে বিরিয়ানি দিবে ইনশাআল্লাহ।", verified: true, hasBiryani: true},
+                {lat: 24.3700, lng: 88.9300, name: "মাদ্রাসা রোড জামে মসজিদ", desc: "প্রতিদিন ইফতার, শুক্রবার বিরিয়ানি।", verified: false, hasBiryani: true}
+            ];
+
+            // বিরিয়ানি কাউন্ট আপডেট ফাংশন
+            function updateBiryaniCount() {
+                const count = sampleLocations.filter(loc => loc.hasBiryani).length;
+                document.getElementById('biryaniCount').innerText = count;
+                document.getElementById('biryaniStat').innerText = count;
+                document.getElementById('totalIftar').innerText = sampleLocations.length;
+            }
+            updateBiryaniCount();
+
+            // মার্কার তৈরি
+            sampleLocations.forEach(function(item) {
+                // মার্কারের রঙ নির্ধারণ (বিরিয়ানি দিলে স্পেশাল মার্কার)
+                let markerColor = item.verified ? '#4CAF50' : '#FFC107';
+                let borderColor = 'white';
+                let iconHtml = `<div style="background-color:${markerColor}; width:20px; height:20px; border-radius:50%; border:3px solid ${borderColor}; box-shadow:0 2px 5px rgba(0,0,0,0.3);"></div>`;
+                
+                // বিরিয়ানি দিলে গোল্ডেন রিং যোগ
+                if (item.hasBiryani) {
+                    iconHtml = `<div style="background-color:${markerColor}; width:20px; height:20px; border-radius:50%; border:3px solid #ffb347; box-shadow:0 0 0 2px rgba(255,180,71,0.5);"></div>`;
+                }
+
+                const marker = L.marker([item.lat, item.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: iconHtml,
+                        iconSize: [20, 20]
+                    })
+                }).addTo(biryaniLayer);
+
+                let popupText = `<b>${item.name}</b><br>${item.desc}<br>`;
+                popupText += item.verified ? '✅ যাচাইকৃত' : '⚠️ অযাচাইকৃত';
+                if (item.hasBiryani) {
+                    popupText += '<br><span style="background:#ffb347; color:#1e3c2c; padding:2px 8px; border-radius:12px; font-size:0.7rem; font-weight:600;"><i class="fas fa-crown"></i> আজ বিরিয়ানি দিচ্ছে</span>';
+                }
+                marker.bindPopup(popupText);
+            });
+
+            // ---------- ম্যাপে ক্লিক করে তথ্য যোগ (ইউজার ফ্রেন্ডলি পপআপ) ----------
+            map.on('click', function(e) {
+                if (!bounds.contains(e.latlng)) {
+                    alert('শুধু নাটোর জেলার ভিতরে ক্লিক করুন।');
+                    return;
+                }
+
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+
+                const popupContent = `
+                    <div style="text-align:center;">
+                        <h4 style="margin:0 0 8px; color:#1e3c2c;">🍛 নতুন ইফতার তথ্য</h4>
+                        <input type="text" id="mosqueName" placeholder="মসজিদের নাম" style="width:100%;">
+                        <textarea id="details" placeholder="বিস্তারিত (যেমন: কখন দেয়, কি দেয়)" rows="2" style="width:100%;"></textarea>
+                        <label style="display:flex; align-items:center; gap:5px; margin:5px 0;">
+                            <input type="checkbox" id="hasBiryani" value="yes"> <i class="fas fa-crown" style="color:#ffb347;"></i> এখানে বিরিয়ানি দিচ্ছে
+                        </label>
+                        <button class="add-btn" onclick="addBiryaniLocation(${lat}, ${lng})">✅ তথ্য যোগ করুন</button>
+                        <button class="add-btn" onclick="map.closePopup()" style="background:#888;">❌ বাতিল</button>
+                        <p style="font-size:10px; margin-top:8px;">📍 ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
+                    </div>
+                `;
+
+                L.popup({ className: 'custom-popup', maxWidth: 260 })
+                    .setLatLng(e.latlng)
+                    .setContent(popupContent)
+                    .openOn(map);
+            });
+
+            // গ্লোবাল ফাংশন (পপআপ থেকে কল)
+            window.addBiryaniLocation = function(lat, lng) {
+                const mosqueName = document.getElementById('mosqueName')?.value.trim();
+                const details = document.getElementById('details')?.value.trim();
+                const hasBiryani = document.getElementById('hasBiryani')?.checked;
+
+                if (!mosqueName) {
+                    alert('অনুগ্রহ করে মসজিদের নাম দিন।');
+                    return;
+                }
+
+                // নতুন মার্কার (নীল - ব্যবহারকারী যোগ করেছে)
+                let iconHtml = `<div style="background-color:#2196F3; width:20px; height:20px; border-radius:50%; border:3px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3);"></div>`;
+                if (hasBiryani) {
+                    iconHtml = `<div style="background-color:#2196F3; width:20px; height:20px; border-radius:50%; border:3px solid #ffb347; box-shadow:0 0 0 2px rgba(255,180,71,0.5);"></div>`;
+                }
+
+                const newMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'custom-div-icon',
+                        html: iconHtml,
+                        iconSize: [20, 20]
+                    })
+                }).addTo(biryaniLayer);
+
+                let popupMsg = `<b>${mosqueName}</b><br>${details || 'কোনো বিবরণ নেই'}<br>🆕 আপনার যোগ করা`;
+                if (hasBiryani) {
+                    popupMsg += '<br><span style="background:#ffb347; color:#1e3c2c; padding:2px 8px; border-radius:12px;"> আজ বিরিয়ানি দিচ্ছে</span>';
+                    
+                    // কাউন্ট আপডেট (শুধু ভিজুয়াল, ডাটা অ্যারে আপডেট না করলেও কাউন্ট দেখায়)
+                    let currentCount = parseInt(document.getElementById('biryaniCount').innerText);
+                    document.getElementById('biryaniCount').innerText = currentCount + 1;
+                    document.getElementById('biryaniStat').innerText = currentCount + 1;
+                }
+                newMarker.bindPopup(popupMsg);
+
+                // মোট ইফতার কাউন্ট আপডেট
+                let total = parseInt(document.getElementById('totalIftar').innerText) + 1;
+                document.getElementById('totalIftar').innerText = total;
+
+                map.closePopup();
+                alert('আপনার তথ্য মানচিত্রে যুক্ত হয়েছে। ধন্যবাদ!');
+            };
+
+            // ---------- অ্যাক্টিভ ইউজার র‍্যান্ডম আপডেট (শুধু ডেমো) ----------
+            setInterval(() => {
+                const active = Math.floor(Math.random() * 30) + 35; // 35-65
+                document.getElementById('activeUsers').innerText = active;
+            }, 10000);
+
+        })();
+    </script>
+</body>
+</html>
